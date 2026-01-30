@@ -1,0 +1,58 @@
+# =========================
+# Core Backend
+# =========================
+fastapi
+uvicorn[standard]
+python-multipart
+
+# =========================
+# LangChain + LangGraph
+# =========================
+langchain
+langchain-core
+langgraph
+
+# =========================
+# LLM Providers
+# =========================
+langchain-google-genai
+langchain-huggingface
+huggingface-hub
+
+# =========================
+# Embeddings + Vector Store
+# =========================
+sentence-transformers
+faiss-cpu
+
+# =========================
+# RAG Utilities
+# =========================
+tiktoken
+
+# =========================
+# Voice (Text → Speech)
+# =========================
+gTTS
+
+# =========================
+# Search (References Agent)
+# =========================
+ddgs
+
+# =========================
+# Database (MongoDB)
+# =========================
+pymongo
+
+# =========================
+# Document Parsing
+# =========================
+python-docx
+pypdf
+
+# =========================
+# Utilities
+# =========================
+python-dotenv
+requests
