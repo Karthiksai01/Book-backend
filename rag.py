@@ -7,12 +7,15 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
-
+import os
+from dotenv import load_dotenv
+load_dotenv()
 # ✅ local embedding model
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 embeddings = GoogleGenerativeAIEmbeddings(
-    model="models/embedding-001"
+    model="models/embedding-001",
+    google_api_key=os.getenv("GEMINI_API_KEY")
 )
 
 
