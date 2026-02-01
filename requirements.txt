@@ -7,16 +7,9 @@ pydantic-settings
 langchain
 langgraph
 langchain-google-genai
-
-chromadb
-sentence-transformers
-transformers
-torch
-
 google-generativeai
 
 motor
 pymongo
-
 SQLAlchemy
 psycopg2-binary

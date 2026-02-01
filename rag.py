@@ -2,14 +2,18 @@ import os
 from pathlib import Path
 from typing import List
 
-from sentence_transformers import SentenceTransformer
+#from sentence_transformers import SentenceTransformer
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 
 # ✅ local embedding model
-_st_model = SentenceTransformer("all-MiniLM-L6-v2")
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
+embeddings = GoogleGenerativeAIEmbeddings(
+    model="models/embedding-001"
+)
 
 
 class LocalSentenceTransformerEmbeddings(Embeddings):
