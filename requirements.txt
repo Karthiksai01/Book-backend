@@ -6,8 +6,9 @@ pydantic-settings
 
 langchain
 langgraph
-chromadb
+langchain-google-genai
 
+chromadb
 sentence-transformers
 transformers
 torch
