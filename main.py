@@ -1,17 +1,14 @@
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import StreamingResponse
-from fastapi import HTTPException
-from models import documents_collection
-import os, shutil
-import json
-import time
 
+import os
+import shutil
 import uuid
 
 from graph import app_graph
 from models import (
+    documents_collection,
     get_chat_history,
     save_document,
     get_document,
@@ -20,40 +17,45 @@ from models import (
 )
 
 from utils import extract_text
-from rag import build_and_save_vectorstore
+
 
 app = FastAPI(title="StudyMate AI")
 
+# ✅ CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5174",
         "http://127.0.0.1:5174",
-        "http://localhost:5173",   
-        "http://127.0.0.1:5173"    
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
+# ===============================
+# ROOT ROUTES
+# ===============================
 
-
-# ✅ Home Route (avoids 404 on "/")
 @app.get("/")
 def home():
     return {"message": "StudyMate AI backend running ✅"}
 
 
-# ✅ Health Route
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
 
-# ✅ Upload Document Route (PDF/DOCX/TXT)
+# ===============================
+# UPLOAD DOCUMENT
+# ===============================
+
 @app.post("/upload")
 async def upload_document(
     user_id: str = Form(...),
@@ -62,16 +64,13 @@ async def upload_document(
     try:
         file_bytes = await file.read()
 
-        # ✅ Extract text
         text = extract_text(file.filename, file_bytes)
 
         if not text.strip():
             return {"error": "Could not extract text from document."}
 
-        # ✅ Create unique document_id
         document_id = str(uuid.uuid4())
 
-        # ✅ Save to MongoDB
         save_document(
             user_id=user_id,
             document_id=document_id,
@@ -79,8 +78,8 @@ async def upload_document(
             text=text
         )
 
-        # ✅ Build & save vectorstore immediately (RAG)
-        build_and_save_vectorstore(document_id, text)
+        # ❌ Removed build_and_save_vectorstore
+        # RAG is now built dynamically inside chat_agent
 
         return {
             "message": "Document uploaded successfully ✅",
@@ -92,42 +91,41 @@ async def upload_document(
         return {"error": f"Upload failed: {str(e)}"}
 
 
-# ✅ Main Agent Router Endpoint
+# ===============================
+# AGENT ROUTER
+# ===============================
+
 @app.post("/agent")
 def run_agent(payload: dict):
     try:
-        # ✅ Extract fields
         user_id = payload.get("user_id")
         document_id = payload.get("document_id")
         agent_type = payload.get("agent_type")
 
-        # ✅ Validations
         if not user_id:
             return {"error": "user_id is required"}
 
         if not agent_type:
             return {"error": "agent_type is required"}
 
-        # ✅ Allowed agents
         valid_agents = ["chat", "summarize", "voice", "reference", "doubt"]
 
         if agent_type not in valid_agents:
             return {"error": f"Invalid agent_type. Use one of: {valid_agents}"}
 
-        # ✅ For doubt agent → document is OPTIONAL
         document_text = None
+
         if agent_type != "doubt":
             if not document_id:
                 return {"error": "document_id is required"}
 
-            # ✅ Fetch document from DB
             doc = get_document(document_id)
+
             if not doc:
                 return {"error": "Document not found. Please upload document first."}
 
             document_text = doc["text"]
 
-        # ✅ Prepare state for LangGraph
         state = {
             "user_id": user_id,
             "document_id": document_id or "no_doc",
@@ -145,7 +143,11 @@ def run_agent(payload: dict):
     except Exception as e:
         return {"error": f"Agent execution failed: {str(e)}"}
 
-# ✅ List All Documents Uploaded by User
+
+# ===============================
+# DOCUMENT ROUTES
+# ===============================
+
 @app.get("/documents/{user_id}")
 def list_documents(user_id: str):
     try:
@@ -154,7 +156,6 @@ def list_documents(user_id: str):
         return {"error": f"Failed to fetch documents: {str(e)}"}
 
 
-# ✅ Get Chat History for One Document
 @app.get("/history/{user_id}/{document_id}")
 def chat_history(user_id: str, document_id: str):
     try:
@@ -166,8 +167,6 @@ def chat_history(user_id: str, document_id: str):
 @app.delete("/documents/{user_id}/{document_id}")
 def delete_document(user_id: str, document_id: str):
     try:
-        print("DELETE REQUEST:", user_id, document_id)
-
         result = documents_collection.delete_one({
             "user_id": user_id,
             "document_id": document_id
@@ -176,15 +175,18 @@ def delete_document(user_id: str, document_id: str):
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Document not found")
 
-        vector_path = f"vectorstores/{document_id}"
-        if os.path.exists(vector_path):
-            shutil.rmtree(vector_path)
+        # ❌ Removed vectorstore folder deletion
+        # Because we are no longer saving to disk
 
         return {"message": "Document deleted successfully"}
 
     except Exception as e:
-        print("❌ DELETE ERROR:", e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ===============================
+# LOCAL RUN
+# ===============================
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,17 +1,21 @@
 from llm import llm
-from models import save_chat
-from rag import build_and_save_vectorstore, load_vectorstore, retrieve_chunks
-from models import save_voice_note, get_voice_note
+from models import save_chat, save_voice_note, get_voice_note
+from rag import build_vectorstore, retrieve_chunks
+
 import os
 import uuid
 from gtts import gTTS
 
-import re
 from search import web_search, youtube_search
 
 
+# In-memory vectorstore cache (Render-safe)
 VECTORSTORE_CACHE = {}
 
+
+# ==============================
+# 📚 Chat Agent (RAG)
+# ==============================
 def chat_agent(state):
     document_text = state.get("document_text") or ""
     user_query = state.get("user_query") or ""
@@ -26,25 +30,19 @@ def chat_agent(state):
 
     doc_id = state["document_id"]
 
-    # ✅ 1) try cache
+    # Use in-memory cache
     vectorstore = VECTORSTORE_CACHE.get(doc_id)
 
-    # ✅ 2) if not cache, try disk
     if vectorstore is None:
-        vectorstore = load_vectorstore(doc_id)
+        vectorstore = build_vectorstore(document_text)
+        VECTORSTORE_CACHE[doc_id] = vectorstore
 
-    # ✅ 3) if not disk, build and save
-    if vectorstore is None:
-        vectorstore = build_and_save_vectorstore(doc_id, document_text)
-
-    VECTORSTORE_CACHE[doc_id] = vectorstore
-
-    retrieved_context = retrieve_chunks(vectorstore, user_query, k=3)
+    retrieved_context = retrieve_chunks(vectorstore, user_query)
 
     prompt = f"""
 You are StudyBook AI (student assistant).
 Answer ONLY using the context below.
-If the answer is not present, say: "Not found in document."
+If the answer is not present, say: Not found in document.
 
 Context:
 {retrieved_context}
@@ -66,12 +64,14 @@ Question:
     return state
 
 
-
+# ==============================
+# 📝 Summarizer Agent
+# ==============================
 def summarizer_agent(state):
     doc_text = state.get("document_text") or ""
 
     if not doc_text.strip():
-        state["output"] = "❌ No document found to summarize."
+        state["output"] = "No document found to summarize."
         return state
 
     prompt = f"""
@@ -80,18 +80,17 @@ You are StudyMate AI for students.
 Task:
 Summarize the document in a clean study format.
 
-Output Format (must follow exactly):
+Output Format:
 1) 5-Line Summary
-2) Key Points (6 to 10 bullets with black bold dot symbol in beginning)
+2) Key Points (6 to 10 bullets)
 3) Important Terms (5 to 8 terms with 1-line meaning)
 4) Quick Revision (3 to 5 lines)
 
 Rules:
 - Use simple language
 - Don't add extra sections
-- Don't write too long
-- Dont't give ** and # all these special characters in beginning of text or line
--Don't mention 5 lines or 10 points just give key points and summary 
+- Don't use special characters like # or **
+- Keep it clean and readable
 
 Document:
 {doc_text}
@@ -102,12 +101,15 @@ Document:
     return state
 
 
+# ==============================
+# 🔊 Voice Agent
+# ==============================
 def voice_agent(state):
     user_id = state.get("user_id")
     doc_id = state.get("document_id")
     doc_text = state.get("document_text") or ""
 
-    # ✅ 1) Check cache first
+    # Check cache in MongoDB
     cached = get_voice_note(user_id, doc_id)
     if cached:
         state["output"] = {
@@ -118,27 +120,23 @@ def voice_agent(state):
         return state
 
     if not doc_text.strip():
-        state["output"] = "❌ No document found to generate voice explanation."
+        state["output"] = "No document found to generate voice explanation."
         return state
 
-    # ✅ 2) Generate script using LLM
     prompt = f"""
 You are StudyBook AI.
 
-Task:
-Create a voice-note style explanation of the following document.
+Create a voice-note style explanation.
 
-Target duration:
-3 to 4 minutes (approx 450 to 650 words)
+Duration:
+3 to 4 minutes (450–650 words)
 
 Rules:
-- Explain like teaching a student.
-- Use simple language.
-- Use small examples where needed.
-- Do not use headings.
-- Do not add bullet points.
-- Make it sound like a real voice narration.
-- Output ONLY the voice script text.
+- Explain like teaching a student
+- Use simple language
+- No headings
+- No bullet points
+- Natural narration style
 
 Document:
 {doc_text}
@@ -147,7 +145,6 @@ Document:
     response = llm.invoke(prompt)
     script_text = response.content.strip()
 
-    # ✅ 3) Convert script to MP3
     audio_id = str(uuid.uuid4())
     filename = f"{audio_id}.mp3"
 
@@ -161,7 +158,6 @@ Document:
 
     audio_url = f"/static/audio/{filename}"
 
-    # ✅ 4) Save into MongoDB (cache)
     save_voice_note(user_id, doc_id, audio_url, script_text)
 
     state["output"] = {
@@ -173,6 +169,9 @@ Document:
     return state
 
 
+# ==============================
+# 🌐 Reference Agent
+# ==============================
 def reference_agent(state):
     topic = state.get("user_query") or ""
 
@@ -189,22 +188,21 @@ def reference_agent(state):
     }
     return state
 
+
+# ==============================
+# ❓ Doubt Agent
+# ==============================
 def doubt_agent(state):
-    """
-    Simple doubt clarification chatbot (not RAG).
-    Uses user query only, can optionally use chat history.
-    """
     query = state.get("user_query") or ""
     history = state.get("chat_history") or []
 
     prompt = f"""
-You are StudyMate AI - Doubt Clarifier for students.
+You are StudyMate AI - Doubt Clarifier.
 
-Your job:
-- Explain in very simple terms
-- Give step-by-step clarification
-- If needed, give short example
-- Be friendly and clear
+Explain in simple language.
+Give step-by-step clarification.
+Use short examples if needed.
+Be friendly and clear.
 
 Conversation History:
 {history}
