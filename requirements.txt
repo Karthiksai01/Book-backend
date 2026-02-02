@@ -1,6 +1,8 @@
 fastapi
-uvicorn
+uvicorn[standard]
 python-dotenv
+python-multipart
+
 pydantic
 pydantic-settings
 
@@ -13,12 +15,12 @@ langgraph
 
 google-generativeai
 
-motor
 pymongo
-SQLAlchemy
-psycopg2-binary
 
 gTTS
 duckduckgo-search
+
 python-docx
 pypdf
+
+requests
