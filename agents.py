@@ -176,7 +176,10 @@ def reference_agent(state):
     topic = state.get("user_query") or ""
 
     if not topic.strip():
-        state["output"] = {"websites": [], "youtube": []}
+        state["output"] = {
+            "websites": [],
+            "youtube": []
+        }
         return state
 
     websites = web_search(topic, max_results=5)
@@ -186,7 +189,9 @@ def reference_agent(state):
         "websites": websites,
         "youtube": youtube
     }
+
     return state
+
 
 
 # ==============================
