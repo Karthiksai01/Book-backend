@@ -15,18 +15,17 @@ def web_search(query: str, max_results: int = 5):
             max_results=max_results
         )
 
-        results = []
-        for r in response.get("results", []):
-            results.append({
-                "title": r.get("title", ""),
-                "link": r.get("url", ""),
-                "snippet": r.get("content", "")
-            })
+        urls = []
 
-        return results
+        for r in response.get("results", []):
+            url = r.get("url", "")
+            if url and "youtube.com" not in url and "youtu.be" not in url:
+                urls.append(url)
+
+        return urls[:max_results]
 
     except Exception as e:
-        print("Tavily Web Search Error:", e)
+        print("Web search error:", e)
         return []
 
 
@@ -40,19 +39,15 @@ def youtube_search(query: str, max_results: int = 4):
             max_results=max_results
         )
 
-        results = []
+        yt_urls = []
+
         for r in response.get("results", []):
-            link = r.get("url", "")
+            url = r.get("url", "")
+            if "youtube.com/watch" in url or "youtu.be" in url:
+                yt_urls.append(url)
 
-            if "youtube.com/watch" in link or "youtu.be" in link:
-                results.append({
-                    "title": r.get("title", ""),
-                    "link": link,
-                    "snippet": r.get("content", "")
-                })
-
-        return results[:max_results]
+        return yt_urls[:max_results]
 
     except Exception as e:
-        print("Tavily YouTube Search Error:", e)
+        print("YouTube search error:", e)
         return []
