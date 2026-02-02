@@ -19,3 +19,4 @@ SQLAlchemy
 psycopg2-binary
 
 gTTS
+duckduckgo-search
