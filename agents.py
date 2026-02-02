@@ -173,17 +173,70 @@ Document:
 # 🌐 Reference Agent
 # ==============================
 def reference_agent(state):
-    topic = state.get("user_query") or ""
+    query = state.get("user_query") or ""
 
-    if not topic.strip():
+    if not query.strip():
         state["output"] = {
             "websites": [],
             "youtube": []
         }
         return state
 
-    websites = web_search(topic, max_results=5)
-    youtube = youtube_search(topic, max_results=4)
+    prompt = f"""
+You are StudyMate AI - Reference Provider.
+
+Your task:
+Provide useful reference links related to the student's topic.
+
+STRICT RULES:
+- Return ONLY valid URLs.
+- No explanations.
+- No extra text.
+- No numbering.
+- No markdown.
+- No titles.
+- No descriptions.
+
+Output format MUST be exactly:
+
+Websites:
+<url>
+<url>
+<url>
+
+YouTube:
+<url>
+<url>
+<url>
+
+Topic:
+{query}
+"""
+
+    response = llm.invoke(prompt)
+
+    raw_output = response.content.strip()
+
+    websites = []
+    youtube = []
+
+    current_section = None
+
+    for line in raw_output.splitlines():
+        line = line.strip()
+
+        if line.lower().startswith("websites"):
+            current_section = "websites"
+            continue
+        elif line.lower().startswith("youtube"):
+            current_section = "youtube"
+            continue
+
+        if line.startswith("http"):
+            if current_section == "websites":
+                websites.append(line)
+            elif current_section == "youtube":
+                youtube.append(line)
 
     state["output"] = {
         "websites": websites,
