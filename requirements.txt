@@ -21,3 +21,4 @@ psycopg2-binary
 gTTS
 duckduckgo-search
 python-docx
+pypdf
