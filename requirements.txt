@@ -16,6 +16,7 @@ langgraph
 google-generativeai
 
 pymongo
+chromadb
 
 gTTS
 duckduckgo-search
