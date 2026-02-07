@@ -7,9 +7,10 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 # Gemini Embeddings
 embeddings = GoogleGenerativeAIEmbeddings(
-    model="models/embedding-001",
-    google_api_key=os.getenv("GEMINI_API_KEY"),
+    model="models/text-embedding-004",
+    google_api_key=os.getenv("GEMINI_API_KEY")
 )
+
 
 # In-memory vector store (Render safe)
 def build_vectorstore(document_text: str):
