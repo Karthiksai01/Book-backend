@@ -18,6 +18,10 @@ google-generativeai
 pymongo
 chromadb
 
+sentence-transformers
+faiss-cpu
+
+
 gTTS
 duckduckgo-search
 

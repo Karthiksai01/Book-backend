@@ -1,55 +1,31 @@
-import os
 from typing import List
-
-import google.generativeai as genai
-from dotenv import load_dotenv
-
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import Chroma
+from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
+from sentence_transformers import SentenceTransformer
 
 
 # ==============================
-# Load Environment
+# Local Embedding Model
 # ==============================
-load_dotenv()
-
-genai.configure(
-    api_key=os.getenv("GEMINI_API_KEY")
-)
+_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 
-# ==============================
-# Gemini Custom Embedding Class
-# ==============================
-class GeminiEmbeddings(Embeddings):
+class LocalEmbeddings(Embeddings):
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        embeddings = []
-        for text in texts:
-            response = genai.embed_content(
-                model="models/embedding-001",
-                content=text,
-                task_type="retrieval_document"
-            )
-            embeddings.append(response["embedding"])
-        return embeddings
+        return _model.encode(texts).tolist()
 
     def embed_query(self, text: str) -> List[float]:
-        response = genai.embed_content(
-            model="models/embedding-001",
-            content=text,
-            task_type="retrieval_query"
-        )
-        return response["embedding"]
+        return _model.encode([text])[0].tolist()
 
 
-# Initialize embedding model
-embeddings = GeminiEmbeddings()
+# Initialize embeddings
+embeddings = LocalEmbeddings()
 
 
 # ==============================
-# In-Memory Vector Store (Render Safe)
+# Build Vectorstore (In Memory)
 # ==============================
 def build_vectorstore(document_text: str):
     splitter = RecursiveCharacterTextSplitter(
@@ -60,16 +36,16 @@ def build_vectorstore(document_text: str):
     chunks = splitter.split_text(document_text)
     docs = [Document(page_content=c) for c in chunks]
 
-    vectorstore = Chroma.from_documents(
-        documents=docs,
-        embedding=embeddings
+    vectorstore = FAISS.from_documents(
+        docs,
+        embeddings
     )
 
     return vectorstore
 
 
 # ==============================
-# Retrieval
+# Retrieve Relevant Chunks
 # ==============================
 def retrieve_chunks(vectorstore, query: str, k: int = 3):
     results = vectorstore.similarity_search(query, k=k)
